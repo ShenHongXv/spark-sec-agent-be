@@ -16,22 +16,24 @@
 - 输入质量提示改为语义描述，不依赖Case 2/Case 10编号；
 - WSK-002、WSK-011、WSK-014来源问题及WSK-013/014的case10越界关联已修正；
 - `pyproject.toml`和`uv.lock`加入Windows所需`tzdata`。
+- 真实主链的证据摘要按`ref_id→summary`映射，空摘要不会造成后续证据错配；
+- 删除旧`KnowledgeEntry`测试链，加载、匹配、未命中和知识缺口测试统一走`KnowledgeCard`正式解析器。
 
 实际命令与结果：
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests/test_knowledge_gate_contract.py tests/test_knowledge_mode.py tests/test_knowledge_cards.py tests/test_knowledge_tool.py tests/test_gatekeeper_case1_10.py tests/test_deep_agent_bridge.py -q
-# 127 passed
+# 124 passed
 
 .venv\Scripts\python.exe -m pytest -q
-# 312 passed, 1 skipped, 1 warning
+# 309 passed, 1 skipped, 1 warning
 ```
 
 运行态工具注册复验：同一CLI入口读取正式样例后，case9工具列表包含`knowledge_query`，case10工具列表不包含`knowledge_query`；两次运行均因未配置本地真实MCP地址而只加载仓库内可用工具，该告警不影响门禁判定。
 
 唯一warning来自Starlette TestClient对AnyIO旧别名的弃用提示，不影响本轮功能判定。跳过项仍须结合测试名和最终CI说明，不得笼统写成全部通过。
 
-远程证据：PR #50头`6f59e59`的GitHub Actions（run `34737593920`）已通过，Python 3.11结果为`312 passed, 1 skipped`。后续纯文档提交不改变上述运行代码；最终合并前仍须确认PR最新检查保持绿色。
+远程基线证据：PR #50头`ae5aea0`的GitHub Actions（run `34742258627`）曾以`314 passed, 1 skipped`通过。本轮删除6条只验证旧`KnowledgeEntry`链的测试，迁移并保留12条正式`KnowledgeCard`测试，同时新增1条证据ID映射回归，因此本地全仓数量调整为`309 passed, 1 skipped`；测试总数下降不代表正式运行路径覆盖减少。最终以本轮整改推送后的PR最新CI为准。
 
 ## 1. 测试范围
 
@@ -66,11 +68,11 @@ python -m unittest tests.test_knowledge_case_inputs -v
 python -m unittest tests.test_knowledge_evaluation_summary_schema -v
 ```
 
-当前相关测试共 24 条：
+当前三类基础相关测试共18条：
 
 | 文件 | 数量 | 覆盖内容 |
 |---|---:|---|
-| `tests/test_knowledge_tool.py` | 18 | 条目加载、5 类查询覆盖、命中与未命中、`evidence_refs`、工具名及注册 |
+| `tests/test_knowledge_tool.py` | 12 | 15张结构化卡加载、ID/主题/受控别名匹配、未命中与知识缺口、来源、工具名及注册 |
 | `tests/test_knowledge_case_inputs.py` | 3 | 六案加载与唯一性、case6 纯负向边界、case1/2 来源限制 |
 | `tests/test_knowledge_evaluation_summary_schema.py` | 3 | 评测汇总 Schema 必填字段、枚举、最小 fixture 和核心路径覆盖 |
 
@@ -121,6 +123,7 @@ manual_takeover, step_count, duration_ms, human_review
 - [x] PR 冲突解决工作树的 21 条相关自动化测试通过（2026-09-05）。
 - [x] 评测汇总 Schema 与最小 fixture 已冻结并加入结构守护测试（2026-09-06）。
 - [x] PR #50安全P0代码及状态文档头`6f59e59`的仓库CI通过：`312 passed, 1 skipped`。
+- [x] 杨嘉琪Review提出的证据ID/摘要错配已改为按ID映射；旧`KnowledgeEntry`解析链已删除；域外工具注册口径已同步。
 - [ ] case1、case2 在最终提交上完成报告复验，知识引用与事件证据分开。
 - [ ] case6 在最终提交上完成负向复验，未调用 WebShell 知识且未新增 WebShell 事实。
 - [ ] Agent 报告、运行元数据和回执保存到团队指定受控位置，仓库只保留判据和结论索引。
@@ -138,3 +141,4 @@ manual_takeover, step_count, duration_ms, human_review
 | 2026-09-05 | PR #41 重写测试说明，区分自动化测试、成员回执和 Agent 报告证据 |
 | 2026-09-06 | 冻结评测汇总 Schema，新增最小 fixture 与结构守护测试 |
 | 2026-09-13 | 最终收口候选新增fail-closed、正式样例输入归一化、否定语义、域外优先级和bridge门禁绑定回归；目标测试127项通过，全仓312项通过、1项跳过；CLI实测case9注册知识工具、case10不注册 |
+| 2026-09-13 | 按杨嘉琪Review修复证据ID/摘要错配，新增空摘要错位复现；删除旧`KnowledgeEntry`测试链并迁移至唯一`KnowledgeCard`路径；同步域外事件不注册知识工具的接口口径 |

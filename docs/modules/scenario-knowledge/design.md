@@ -37,19 +37,19 @@
 - `data.source_citations`：知识来源URL和等级；
 - `data.gate_decision=in_scope`。
 
-`weak_signal`只返回`partial`限制信息，不返回确认性知识；`out_of_scope`返回`knowledge_scope_mismatch`；门禁缺失返回`missing_knowledge_gate_decision`。未命中或输入为空也返回`failed`，不生成兜底事实。
+`weak_signal`只返回`partial`限制信息，不返回确认性知识。正式CLI和主链bridge遇到`out_of_scope`、门禁缺失或门禁异常时根本不注册`knowledge_query`，因此Agent不会获得域外工具调用结果；工具类若被测试或其他代码直接实例化，仍分别返回`knowledge_scope_mismatch`或`missing_knowledge_gate_decision`，作为防御性二次门禁。未命中或输入为空返回`failed`，不生成兜底事实。
 
 ## 4. 核心流程
 
 1. CLI或主链bridge先把事件转换为`SecurityEventInput`并执行确定性三档门禁。
 2. 仅在门禁为`in_scope/weak_signal`时构建带该结果的`knowledge_query`；`out_of_scope`、门禁异常或缺失时不注册知识工具。
 3. 工具通过`importlib.resources`读取随包分发的唯一知识正文并解析15张`KnowledgeCard`。
-4. `in_scope`查询执行确定性匹配；`weak_signal/out_of_scope`在匹配前即受限或拒绝。
+4. `in_scope`查询执行确定性匹配；`weak_signal`在匹配前受限；`out_of_scope`在正式注册层已被排除。
 5. 工具自身再次检查门禁；即使被错误地无门禁实例化，也按安全默认拒绝。
 6. Agent可把知识用作调查提示，但最终结论仍受输入事件和实际工具证据约束。
 7. Agent评测完成后，逐案例结果按冻结Schema汇总，人工Review只写入`human_review`，不反向修改输入。
 
-当前条目覆盖攻击原理、攻击特征速查表、主流管理工具与流量特征、证据检查清单、处置建议模板、停止条件与人工接管规则。
+当前15张结构化知识卡覆盖多证据关联、文件/Web日志/进程/网络证据、PHP/JSP/ASPX特征、误报、弱信号、工具失败/空集、植入方式和处置边界。
 
 ## 5. 安全与证据边界
 
@@ -93,3 +93,4 @@
 | 2026-09-05 | PR #41 按当前 `main` 的真实实现重写设计说明，删除旧 PR #8 状态残留 |
 | 2026-09-06 | 冻结评测汇总 Schema 和最小 fixture，补充人工 Review 栏 |
 | 2026-09-13 | 最终收口候选修复门禁`None/异常`fail-open，CLI与bridge改为先审计后注册；修正来源和case10域外边界；补Windows `tzdata`依赖与回归测试 |
+| 2026-09-13 | 删除未被正式工具调用的旧`KnowledgeEntry`解析链，只保留`KnowledgeCard→parse_knowledge_cards→match_knowledge_card→KnowledgeQueryTool`；明确域外事件在正式Agent路径不注册知识工具 |

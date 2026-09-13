@@ -56,7 +56,7 @@
 | 字段/对象 | 类型 | 去向 | 含义与约束 |
 |---|---|---|---|
 | `AlertRecord` | `AlertRecord` | `AlertIngestService`、`Orchestrator` | 保留告警 ID（uuId）、时间（lastTime 优先）、类型、严重性、资产、样例性质、字段级证据和原始记录引用。真实路径下 scenario_fields 含 30 个 xdr_* 前缀原始字段 + evidence_refs 追加 traceBackId（`kind=xdr_traceback`）。 |
-| `SecurityEvent` | `SecurityEvent` | `EventContext.event_summary`、`RiskTriageService`、DeepInvestigationAgent | 包含 `alert_refs`（真实 uuId）、时间范围 `first_seen_at/last_seen_at`（occurred_at 排序两端）、`entities`（`src_ips/dst_ips/assets/source_devices` 四个 set 去重集合，给 MCP 查询用）、`correlation_reason`、`alert_count_before`、`event_count_after` 和摘要。 |
+| `SecurityEvent` | `SecurityEvent` | `EventContext.event_summary`、`RiskTriageService`、DeepInvestigationAgent | 包含结构化`event_type`、`alert_refs`（真实uuId）、`alert_summaries`（alert_id→名称）、`evidence_summaries`（evidence ref_id→非空摘要）、时间范围、实体、关联依据、压缩计数和摘要。引用ID与摘要按键关联，禁止依赖两个列表的位置对齐。 |
 | 关联异常 | `ValueError` | `Orchestrator` 错误处理与上层拆分逻辑 | 空输入、事件类型/资产/设备不一致或超过 15 分钟窗口时拒绝合并。真实 XDR uuId 跨页重复不会产生此异常（fetch 阶段已按 seen_ids 去重）。 |
 
 ## 4. 核心流程与状态变化

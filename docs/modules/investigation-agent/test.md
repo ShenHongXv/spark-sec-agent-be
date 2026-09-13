@@ -88,15 +88,14 @@
 
 | 用例 | 验证点 |
 |------|--------|
-| `test_entries_loaded` | 知识包解析出核心条目（攻击原理 / 特征速查 / 工具流量 / 检查清单 / 处置建议） |
-| `test_attack_principle_content_not_empty` | 条目正文非空 |
-| `test_match_attack_principle` 等 6 例 | 关键词命中：攻击原理 / 处置建议 / 工具流量 / 检查清单 / 人工接管 / 无关词未命中 |
+| `test_all_structured_cards_are_loaded` | 唯一解析器读取15张`KnowledgeCard`，ID唯一且必填内容非空 |
+| `test_match_by_*` 4例 | 按知识ID、主题、受控别名和主题包含匹配正式知识卡 |
+| `test_no_match` / `test_unsupported_attack_group_query_remains_a_gap` | 空白、无关词和未覆盖攻击组织问题保持知识缺口 |
 | `test_schema_ascii_and_name` | schema 名 `knowledge_query` 符合 `^[a-zA-Z0-9_-]+$` |
-| `test_hit_returns_evidence_refs` | 命中返回 `evidence_refs`，summary 同步携带供 LLM 阅读 |
-| `test_attack_principle_evidence_ref` | 攻击原理条目含 T1505.003 引用 |
+| `test_hit_returns_structured_card` | 命中返回知识ID、必要证据、禁止推断和结构化来源 |
+| `test_attack_principle_source_citation` | 攻击原理卡包含MITRE来源URL |
 | `test_miss_returns_failed` | 无关关键词返回 `failed` |
 | `test_registered_in_registry` | 注册进 `ToolRegistry`，schema 名唯一 |
-| `test_sample1..5` | 问答样本覆盖：样本 1/3/4/5 命中对应条目；样本 2（攻击组织）为知识缺口（如实标记） |
 
 ### 5.3 MCP 客户端契约（`tests/test_mcp_client.py`，2026-08-27 新增，任务二）
 

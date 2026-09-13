@@ -159,8 +159,8 @@ class SecurityEvent(BaseModel):
     # 避免下游从面向人的 summary 文本反推机器契约字段。
     event_type: str = ""
     # ID 用于审计定位，摘要用于门禁和 Agent 的语义判断；两者不能互相替代。
-    alert_summaries: list[str] = Field(default_factory=list)
-    evidence_summaries: list[str] = Field(default_factory=list)
+    alert_summaries: dict[str, str] = Field(default_factory=dict)
+    evidence_summaries: dict[str, str] = Field(default_factory=dict)
 
 
 class TriageResult(BaseModel):

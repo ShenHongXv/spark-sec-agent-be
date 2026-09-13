@@ -47,13 +47,13 @@
 | `src/sec_agent/deep_agent/config_gui.py` | tkinter GUI | LLM API 本地配置可视化界面 |
 | `src/sec_agent/deep_agent/tools/base.py` | `Tool` / `ToolResult` / `ToolRegistry` / `ALIAS_MAP` | 工具抽象 + 内部别名层 |
 | `src/sec_agent/deep_agent/tools/mock.py` | `build_mock_tools` | 6 个 Mock 兜底工具 |
-| `src/sec_agent/deep_agent/tools/knowledge.py` | `build_knowledge_tools` / `KnowledgeQueryTool` / `load_knowledge_entries` | 知识包解析 + `knowledge_query` 检索（`evidence_refs`） |
+| `src/sec_agent/deep_agent/tools/knowledge.py` | `parse_knowledge_cards` / `match_knowledge_card` / `build_knowledge_tools` / `KnowledgeQueryTool` | 唯一`KnowledgeCard`解析链 + `knowledge_query`检索 |
 | `src/sec_agent/deep_agent/tools/mcp_client.py` | `MCPClient` / `MCPTool` / `build_mcp_tools` | 深信服 MCP 客户端 |
 | `src/sec_agent/deep_agent/knowledge/webshell-knowledge.md` | 《最小 WebShell 知识包》 | 知识包检索源（沈洪旭维护的权威版） |
 | `src/sec_agent/services/deep_agent_bridge.py` | `DeepAgentBridge` | 主链桥接（`auto`/`deep_agent` 后端，含 knowledge 工具注册） |
 | `src/sec_agent/services/investigation.py` | `DeepInvestigationAgent` | 主链调查服务（三后端分派） |
 | `tests/test_investigation_agent.py` | 单元/集成测试 | 16 用例 + 1 集成 |
-| `tests/test_knowledge_tool.py` | 知识包检索测试 | 19 用例（含问答样本覆盖） |
+| `tests/test_knowledge_tool.py` | 知识包检索测试 | 12用例，统一覆盖`KnowledgeCard`正式解析、匹配、知识缺口、来源和注册 |
 | `tests/test_investigation_and_dispatcher_integration.py` | bridge 集成测试 | 5 用例 |
 
 ## 3. 依赖与配置
@@ -115,14 +115,14 @@ $env:INVESTIGATION_BACKEND="auto"; $env:PYTHONPATH="src"; python -m uvicorn sec_
 
 # knowledge_query 检索调用（脱敏）
 {"keyword":"WebShell处置建议"}
-# → status=success；summary 含条目正文 + evidence_refs；data={"entry":"处置建议模板","evidence_refs":["CISA ..."]}
+# → status=success；summary含知识卡ID与主题；data含knowledge_id、必要证据、调查步骤、禁止推断和source_citations
 ```
 
 ### 5.3 上下游接入注意事项
 
 - 主链桥接契约：`DeepInvestigationAgent(config, llm, tools).investigate(event)` 返回 `InvestigationReport`；`_to_domain_report` 把 `verdict`/`confidence`/`tool_call_records`/`disposal_suggestions`/`need_manual_takeover` 等映射为主链领域模型。
 - `auto` 后端：bridge 不可用/异常时**回退内部工具子链**（`evidence_lookup` + `xdr_log_query`，无 LLM）；`deep_agent` 后端则置不可用报告。
-- `knowledge_query` 返回的 `evidence_refs` 供 Agent 填入报告 `evidence_source`；匹配未命中返回 `failed`，Agent 不得编造条目内容。
+- `knowledge_query` 返回的`source_citations`是知识来源，不是当前事件证据；匹配未命中返回`failed`，Agent不得编造条目内容或把知识来源写成事件观测。
 
 ## 6. 异常处理与安全控制
 
@@ -158,7 +158,7 @@ $env:INVESTIGATION_BACKEND="auto"; $env:PYTHONPATH="src"; python -m uvicorn sec_
 - 日志与关键指标位置：`tool_call_records`（报告字段）、`investigation_steps`（报告字段）、CLI 工具清单、主链 `GET /events/{id}/timeline`。
 - 健康检查或运行状态判断：主链 `GET /health`；CLI 退出码 0 为成功。
 - 兼容的接口/Schema/平台版本：OpenAI 兼容 `chat/completions`；MCP JSON-RPC 2.0 over HTTP（SSE 兼容）；深信服 MCP 函数名以 `ALIAS_MAP` 为契约。
-- 升级、迁移或回退注意事项：`ALIAS_MAP` 与深信服侧函数名需同步更新；bridge 双包名兼容已可容忍包位置变化；知识包 md 结构变化需同步 `_ENTRY_SPECS`。
+- 升级、迁移或回退注意事项：`ALIAS_MAP`与深信服侧函数名需同步更新；bridge双包名兼容已可容忍包位置变化；知识包Markdown结构变化需同步`KnowledgeCard`必填字段、解析测试和受控查询别名，不得新增第二套解析器。
 
 ## 10. 变更记录
 

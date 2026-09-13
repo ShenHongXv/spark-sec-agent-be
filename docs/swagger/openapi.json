@@ -1682,17 +1682,17 @@
             "default": ""
           },
           "alert_summaries": {
-            "items": {
+            "additionalProperties": {
               "type": "string"
             },
-            "type": "array",
+            "type": "object",
             "title": "Alert Summaries"
           },
           "evidence_summaries": {
-            "items": {
+            "additionalProperties": {
               "type": "string"
             },
-            "type": "array",
+            "type": "object",
             "title": "Evidence Summaries"
           }
         },

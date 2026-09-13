@@ -143,10 +143,15 @@ event = AlertCorrelationService(window_minutes=15).correlate(alerts)
 ```text
 SecurityEvent：
 - alert_refs: ["FIX-XDR-WEBSHELL-001"]
+- event_type: "webshell"
+- alert_summaries: {"FIX-XDR-WEBSHELL-001": "WebShell蚁剑工具文件管理"}
+- evidence_summaries: {"FIX-XDR-WEBSHELL-001:alert_name": "..."}
 - entities.assets: ["198.51.100.11"]
 - event_count_after: 1
 - correlation_reason: 包含事件类型、资产、设备和时间窗口
 ```
+
+`alert_summaries`和`evidence_summaries`均按稳定引用ID建映射；无摘要证据不进入映射，bridge仍保留其原始ID。禁止把“全部ID列表”和“仅非空摘要列表”按数组下标拼接，否则会污染门禁判断和审计追踪。
 
 ### 5.3 上下游接入注意事项
 

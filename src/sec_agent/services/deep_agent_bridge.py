@@ -195,15 +195,12 @@ class DeepAgentBridge:
         )
 
     @staticmethod
-    def _described_refs(refs: list[str], descriptions: list[str]) -> list[str]:
+    def _described_refs(refs: list[str], descriptions: dict[str, str]) -> list[str]:
         """同时传递稳定引用和语义摘要，供审计定位与门禁判断使用。"""
-        values = [
-            f"{ref}: {descriptions[index]}" if index < len(descriptions) else ref
-            for index, ref in enumerate(refs)
+        return [
+            f"{ref}: {descriptions[ref]}" if descriptions.get(ref) else ref
+            for ref in refs
         ]
-        if len(descriptions) > len(refs):
-            values.extend(descriptions[len(refs):])
-        return values
 
     @staticmethod
     def _first_entity(event: SecurityEvent, key: str) -> str:

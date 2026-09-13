@@ -24,7 +24,7 @@
 - `investigation_steps`、`false_positives`和`prohibited_inference`；
 - `source_urls`、`source_levels`与`related_cases`。
 
-`match_keyword()` 的优先级为完全匹配、条目关键词被查询包含、查询被条目关键词包含。无有效得分时返回 `None`。
+`match_knowledge_card()`按知识ID精确匹配、受控别名、主题精确匹配和主题包含匹配依次查找。无确定命中时返回`None`。禁止恢复旧`KnowledgeEntry/_ENTRY_SPECS/load_knowledge_entries/match_keyword`并行解析链。
 
 `KnowledgeQueryTool.call()` 的调用示例：
 
@@ -32,7 +32,7 @@
 result = KnowledgeQueryTool(gate_decision="in_scope").call({"keyword": "WebShell处置建议"})
 ```
 
-`in_scope`命中返回`success`和结构化知识卡；`weak_signal`返回`partial`但不返回确认性知识；`out_of_scope`和门禁缺失返回`failed`。调用方必须处理失败状态，不得把未命中、门禁错误或空结果改写为确定性知识。
+`in_scope`命中返回`success`和结构化知识卡；`weak_signal`返回`partial`但不返回确认性知识。正式CLI/bridge对`out_of_scope`和门禁缺失不注册工具；只有直接实例化工具的防御性路径才返回对应`failed`。调用方不得把未命中、门禁错误或空结果改写为确定性知识。
 
 ## 3. 接入方式
 
@@ -105,3 +105,4 @@ python -m sec_agent.deep_agent.main --event docs/modules/scenario-knowledge/know
 | 2026-09-04 | PR #37 合入评测案例；PR #40 校正案例来源与边界 |
 | 2026-09-05 | PR #41 依据当前运行时实现重写开发说明，并明确维护与验收方法 |
 | 2026-09-13 | 最终收口候选实现CLI/bridge先门禁后注册、知识工具缺门禁二次拒绝、通用冲突提示和否定/域外语义测试；`pyproject.toml`加入Windows时区依赖 |
+| 2026-09-13 | 清理旧`KnowledgeEntry`解析实现和旧测试，正式运行与测试统一使用15张`KnowledgeCard`；同步`out_of_scope`正式路径不注册工具的接口说明 |

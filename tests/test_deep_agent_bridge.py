@@ -83,6 +83,36 @@ class DeepAgentBridgeTest(unittest.TestCase):
         self.assertEqual(triage.verdict, TruthVerdict.MALICIOUS)
         self.assertEqual(gate.gate_decision, GateDecision.OUT_OF_SCOPE)
 
+    def test_evidence_summary_is_joined_by_ref_not_list_position(self) -> None:
+        event = self._event().model_copy(
+            update={
+                "evidence_summaries": {
+                    "evidence-with-summary": "Web 进程派生 shell 进程",
+                }
+            }
+        )
+        triage = self._triage().model_copy(
+            update={
+                "supporting_evidence_refs": [
+                    "evidence-without-summary",
+                    "evidence-with-summary",
+                ]
+            }
+        )
+
+        payload = DeepAgentBridge()._to_deep_agent_input(
+            trace_id="trace-ref-map",
+            run_id="run-ref-map",
+            event=event,
+            triage=triage,
+        )
+
+        self.assertEqual(payload["evidence"][0], "evidence-without-summary")
+        self.assertEqual(
+            payload["evidence"][1],
+            "evidence-with-summary: Web 进程派生 shell 进程",
+        )
+
     def test_guarded_mode_without_gate_result_does_not_register_knowledge(self) -> None:
         bridge = DeepAgentBridge()
         modules = bridge._load_modules()
@@ -281,8 +311,10 @@ class DeepAgentBridgeTest(unittest.TestCase):
             event_count_after=1,
             summary="WebShell 高危事件",
             event_type="webshell",
-            alert_summaries=["WebShell 上传后命令执行"],
-            evidence_summaries=["Web 进程派生 shell 进程"],
+            alert_summaries={"FIX-XDR-WEBSHELL-001": "WebShell 上传后命令执行"},
+            evidence_summaries={
+                "FIX-XDR-WEBSHELL-001:alert_name": "Web 进程派生 shell 进程"
+            },
         )
 
     def _triage(self) -> TriageResult:
