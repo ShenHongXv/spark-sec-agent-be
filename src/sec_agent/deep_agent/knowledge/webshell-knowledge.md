@@ -1,3 +1,5 @@
+> 口径说明：文中“5分钟、10秒、30分钟、前后24小时”等固定时间窗均为便于首轮筛查的工程启发式，不是权威来源给出的通用事实或硬判定阈值。实际运行必须结合资产基线、日志时钟偏差、采集延迟和业务场景调整，且不得仅凭命中时间窗确认攻击。
+
 ## 知识ID：WSK-001
 
 - 主题：WebShell 正向调查 - 多证据组合关联识别
@@ -107,7 +109,7 @@
 - 来源URL：
 
   - [Server Software Component: Web Shell, Sub-technique T1505.003 - Enterprise | MITRE ATT&CK&reg;](https://attack.mitre.org/techniques/T1505/003/)（MITRE ATT&CK Web Shell 技术框架）
-  - https://www.cisa.gov/eviction-strategies-tool/info-countermeasures/CM0106?utm_source=openai)（CISA 官方 Web Shell 检测与清除指南）
+  - https://www.cisa.gov/eviction-strategies-tool/info-attack/T1505.003（CISA Web Shell 技术与响应参考）
   - https://safeguard.sh/resources/blog/php-webshell （PHP WebShell 检测方法）
 
 - 来源等级：
@@ -603,9 +605,9 @@
   - 禁止跳过失败工具对应的检测项而不做任何替代检查
   - 禁止将超时错误等同于目标不存在
 - 来源URL：
-  - https://cloud.tencent.com/developer/article/2345678 （腾讯云WebShell排查指南的技术文章，讲解WebShell检测工具失败时的替代排查方案）
+  - https://csrc.nist.gov/pubs/sp/800/61/r3/final （NIST SP 800-61 Rev.3，事件响应中的记录、分析、响应与持续改进原则）
 - 来源等级：
-  - 安全厂商技术分析：B
+  - NIST官方标准：A
 - 关联案例：
   - case8（仅有弱信号时，工具查询失败可能导致误判“无风险”，需注意）
   - case9（正向证据组合场景中，工具失败不应影响对已有证据的判断）
@@ -696,7 +698,7 @@
   - 腾讯云开发者社区：B
 - 关联案例：
   - case9（强证据组合案例，涉及POST请求 + 文件修改 + 进程创建，可能是文件上传漏洞或SQL注入导致植入）
-  - case10（SSH暴力破解，可能获取后台权限后植入WebShell，与植入方式中的后台功能滥用相关）
+  - case10（域外负向对照：不得仅凭SSH暴力破解推断已植入WebShell，本卡不适用）
 
 
 
@@ -736,7 +738,6 @@
   - 禁止将威胁情报匹配结果等同于“攻击已成功”，需结合其他证据确认实际危害
   - 禁止在无流量内容验证的情况下推断通信数据为 WebShell 命令
 - 来源URL：
-  -
   - https://www.freebuf.com/articles/others-articles/331442.html （FreeBuf技术文章，详细讲解使用Volatility进行内存马检测及恶意网络连接分析的方法）
   - https://securelist.com/soc-files-web-shell-chase/115714/ （卡巴斯基安全实验室真实事件分析报告，详细剖析了冰蝎WebShell在IIS进程中的网络通信特征，包括Base64编码、加密流量和进程行为分析）
   - https://blog.csdn.net/weixin_34391445/article/details/91780357 （CSDN技术社区，实战解析WebShell流量特征和攻击链还原过程，涵盖HTTP请求分析、异常连接识别和内网穿透流量检测）
@@ -746,7 +747,7 @@
   - CSDN技术社区：C
 - 关联案例：
   - case9（强证据组合中可能包含网络外连，用于形成完整攻击链）
-  - case10（SSH暴力破解事件可能涉及外连，但需确认是否与WebShell相关）
+  - case10（域外负向对照：不得仅凭一般外连或SSH暴力破解套用WebShell C2知识，本卡不适用）
 
 
 

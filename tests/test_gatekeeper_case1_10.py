@@ -401,7 +401,7 @@ class TestTask4CaseSignalAnnotations:
             }
         ]
         assert not ws_evidence, f"{case['case_id']} 证据不得产生 WebShell 范围内信号"
-        assert any("Case 10 数据质量问题" in issue for issue in result.input_quality_issues), "Case 10 必须标注 event_type 误标问题"
+        assert any("事件类型与证据冲突" in issue for issue in result.input_quality_issues), "必须标注 event_type 与证据冲突"
 
 
 class TestTask5GateDecision:
@@ -422,6 +422,48 @@ class TestTask5GateDecision:
         _require_case(10)
         evt = SecurityEventInput.from_dict(_inp(_load_case(10)))
         result = WebShellGatekeeper().audit(evt)
+        assert result.gate_decision == GateDecision.OUT_OF_SCOPE
+
+    def test_negated_strong_terms_do_not_confirm_webshell(self) -> None:
+        evt = SecurityEventInput.from_dict(
+            {
+                "event_id": "NEGATED-001",
+                "event_type": "WebShell",
+                "severity": "MEDIUM",
+                "timestamp": "2026-09-13T00:00:00+08:00",
+                "source_ip": "192.0.2.10",
+                "target_ip": "192.0.2.20",
+                "alerts": ["未发现 cmd.exe 子进程，未检测到 Process.Start 调用"],
+                "evidence": [],
+                "initial_verdict": "证据不足",
+            }
+        )
+
+        result = WebShellGatekeeper().audit(evt)
+
+        assert result.gate_decision == GateDecision.WEAK_SIGNAL
+        assert not any(
+            signal.strength == SignalStrength.IN_SCOPE_CONFIRMED
+            for signal in result.signals
+        )
+
+    def test_out_of_scope_context_wins_over_generic_process_term(self) -> None:
+        evt = SecurityEventInput.from_dict(
+            {
+                "event_id": "SSH-001",
+                "event_type": "SSH_Brute_Force",
+                "severity": "HIGH",
+                "timestamp": "2026-09-13T00:00:00+08:00",
+                "source_ip": "192.0.2.10",
+                "target_ip": "192.0.2.20",
+                "alerts": ["SSH暴力破解后出现一次cmd.exe文本记录"],
+                "evidence": ["SSH服务日志连续登录失败"],
+                "initial_verdict": "SSH暴力破解",
+            }
+        )
+
+        result = WebShellGatekeeper().audit(evt)
+
         assert result.gate_decision == GateDecision.OUT_OF_SCOPE
 
 

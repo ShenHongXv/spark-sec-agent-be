@@ -24,7 +24,7 @@
 - Mock 工具 6 个（`tools/mock.py`，WebShell 主场景人工构造数据）。
 - 深信服 MCP 客户端（`tools/mcp_client.py`，JSON-RPC over HTTP，兼容 SSE；5 服务 19 工具，地址走 gitignore 本地配置）。
 - MCP 空结果识别：dbproxy 系列工具返回 `{"code":0,"msg":"","data":[]}` 时，`MCPTool.call` 判定为 `partial`（「查询成功但无数据」），与 `success`（有数据）/ `failed`（业务错误 `code!=0` 或异常）区分，供 Agent 按「数据为空」触发停止条件而非静默成功。
-- 知识包检索工具 `knowledge_query`（`tools/knowledge.py` + `src/sec_agent/deep_agent/knowledge/webshell-knowledge.md` 权威版），关键词匹配返回条目 + `evidence_refs`；CLI 与主链 bridge 均已注册。
+- 知识包检索工具`knowledge_query`（`tools/knowledge.py`＋唯一结构化知识正文）；CLI与主链bridge仅在`guarded`模式取得合法三档门禁后注册，门禁缺失或异常时安全禁用。
 - 主链集成：`auto` / `deep_agent` 后端经 `services/deep_agent_bridge.py` 桥接；`tool_mock` 后端走内部子链。
 - CLI 入口 `main.py`（`--event` / `-o` 时间戳 / `--list-tools`）、API 可视化配置 `config_gui.py`。
 
@@ -67,7 +67,7 @@
 | `TOOL_MODE` | 可选 | 环境变量 | 默认 `auto`（Mock + 连上的 MCP 并存） |
 | `MCP_URLS` / `mcp_servers.local.json` | 可选 | 环境变量 / gitignore 本地文件 | 未配置/不可达 → 跳过真实 MCP，仅 Mock + 知识包 |
 | `MCP_API_KEY` / `MCP_VERIFY_SSL` | 可选 | 环境变量 | 默认空 / 关闭证书校验 |
-| `tzdata` | 可选（Windows 必需） | `pip install tzdata` | Windows 主链 import 报 `ZoneInfoNotFoundError`（本机已装，依赖清单待补） |
+| `tzdata` | 项目依赖（Windows时区数据） | 随项目依赖安装 | `pyproject.toml`与`uv.lock`已声明，避免`ZoneInfoNotFoundError` |
 
 - 支持的运行环境：Python 3.11+（实测 Windows 11 + Python 3.14.3）；Linux/macOS 理论兼容。
 - 敏感配置（LLM key、真实 MCP 地址）只通过环境变量或受控本地文件注入，不在文档、代码和样例中填写真实值。
@@ -77,7 +77,7 @@
 ```text
 # ① 知识包工具清单（无需 LLM key）
 PYTHONPATH=src python -m sec_agent.deep_agent.main --event tests/fixtures/investigation/sample_event.json --list-tools
-#   预期：26 个工具（6 Mock + knowledge_query + 19 MCP，MCP 依赖本地配置）
+#   工具数量取决于事件三档门禁和实际MCP tools/list；不得固定宣称26个
 
 # ② 完整调查（需配置 LLM；-o 自动加时间戳）
 PYTHONPATH=src python -m sec_agent.deep_agent.main --event tests/fixtures/investigation/sample_event.json -o report.json
@@ -89,7 +89,7 @@ PYTHONPATH=src python -m sec_agent.deep_agent.config_gui
 $env:INVESTIGATION_BACKEND="auto"; $env:PYTHONPATH="src"; python -m uvicorn sec_agent.api.app:app --host 127.0.0.1 --port 8000
 ```
 
-- 成功判据：`--list-tools` 输出含 `knowledge_query`；完整调查退出码 0 并输出结构化报告（含 `tool_call_records`）。
+- 成功判据：`in_scope/weak_signal`事件在`guarded`模式可看到受相应门禁绑定的`knowledge_query`；`out_of_scope`、门禁缺失/异常和`off`模式不得出现该工具。完整调查还须输出含`tool_call_records`的结构化报告。
 - 常见失败及排查：
   - `LLM 未配置`：未设 `LLM_*` / 未保存 `llm_config.local.json`。
   - `Invalid function.name 400`：旧版中文工具名问题，已由别名层修复；确认在最新代码。
@@ -139,7 +139,7 @@ $env:INVESTIGATION_BACKEND="auto"; $env:PYTHONPATH="src"; python -m uvicorn sec_
 | LLM 推理 | **真实调用**（DeepSeek OpenAI 兼容接口，实测通过） | 配置 `LLM_*` 或本地配置 | FastGPT 编排（未实现） |
 | 深信服 MCP 工具 | **真实连通**（5 服务 19 工具注册；dbproxy 等实测调用返回） | 配置 `MCP_URLS` / `mcp_servers.local.json` 且网络可达 | 真实平台**数据**已验证（本轮查询样例虚构实体返回空集，待真实数据联调） |
 | Mock 工具（6 个） | **本地实现**（人工构造 WebShell 演示数据） | `TOOL_MODE=mock`/`auto` | 真实平台返回 |
-| 知识包检索（`knowledge_query`） | **本地实现**（解析沈洪旭权威版 `src/sec_agent/deep_agent/knowledge/webshell-knowledge.md` 为条目 + `evidence_refs`） | 所有工具模式注册 | FastGPT 知识库 / 真实知识服务 |
+| 知识包检索（`knowledge_query`） | **本地实现**（解析唯一结构化知识正文） | `guarded`且门禁为`in_scope/weak_signal`时注册；域外、`off`或门禁失败时不注册 | FastGPT知识库/真实知识服务 |
 | 内部回退子链 | **fallback**（`evidence_lookup` + `xdr_log_query`，无 LLM） | `auto` 后端 bridge 不可用/异常 | 真实 LLM 已运行 |
 | FastGPT 目标路线 | 未实现 | — | 已接入 FastGPT |
 
@@ -147,7 +147,7 @@ $env:INVESTIGATION_BACKEND="auto"; $env:PYTHONPATH="src"; python -m uvicorn sec_
 
 | 优先级 | 事项 | 是否影响主链 | 负责人/完成条件 |
 |---|---|---|---|
-| P1 | Windows 缺 `tzdata` 依赖（建议补入 `pyproject.toml`） | 是（主链 import 即挂） | 补依赖 + 跨平台验证 |
+| 已关闭 | Windows缺`tzdata`依赖 | 曾阻塞主链导入 | 2026-09-13已加入`pyproject.toml`和`uv.lock`并在Windows Python 3.11.11全仓复验 |
 | P1 | 真实平台事件数据联调（dbproxy 空数据问题） | 是（真实场景证据采集） | 真实 XDR 数据接入后复验 |
 | P2 | 知识包最小集缺口（攻击组织、DET0394 细节等） | 否 | 扩充知识包章节 |
 | P2 | 仅覆盖 WebShell 主场景 | 否 | 扩展场景数据 |

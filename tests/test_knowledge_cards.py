@@ -111,7 +111,7 @@ from sec_agent.deep_agent.tools.knowledge import KnowledgeQueryTool
 def test_knowledge_query_returns_structured_card():
     text = KNOWLEDGE_PATH.read_text(encoding="utf-8")
     cards = parse_knowledge_cards(text)
-    tool = KnowledgeQueryTool(cards)
+    tool = KnowledgeQueryTool(cards, gate_decision="in_scope")
 
     result = tool.call({"keyword": "WebShell 植入方式"})
 
@@ -129,7 +129,7 @@ def test_knowledge_query_returns_structured_card():
 def test_knowledge_query_empty_keyword_is_clear_failure():
     text = KNOWLEDGE_PATH.read_text(encoding="utf-8")
     cards = parse_knowledge_cards(text)
-    tool = KnowledgeQueryTool(cards)
+    tool = KnowledgeQueryTool(cards, gate_decision="in_scope")
 
     result = tool.call({"keyword": ""})
 
@@ -140,7 +140,7 @@ def test_knowledge_query_empty_keyword_is_clear_failure():
 def test_knowledge_query_unknown_subject_returns_no_unrelated_card():
     text = KNOWLEDGE_PATH.read_text(encoding="utf-8")
     cards = parse_knowledge_cards(text)
-    tool = KnowledgeQueryTool(cards)
+    tool = KnowledgeQueryTool(cards, gate_decision="in_scope")
 
     result = tool.call({"keyword": "数据库备份性能调优"})
 

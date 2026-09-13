@@ -136,6 +136,38 @@ OUT_OF_SCOPE_KEYWORDS: tuple[str, ...] = (
     "BdThemes",
 )
 
+NEGATION_MARKERS: tuple[str, ...] = (
+    "未发现",
+    "未检测到",
+    "未观察到",
+    "没有发现",
+    "不存在",
+    "不包含",
+    "无法确认",
+    "no evidence",
+    "not found",
+    "not detected",
+)
+
+
+def _contains_affirmed_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    """仅把同一分句中没有被否定的关键词作为正向信号。"""
+    lowered = text.lower()
+    for keyword in keywords:
+        needle = keyword.lower()
+        start = 0
+        while True:
+            index = lowered.find(needle, start)
+            if index < 0:
+                break
+            prefix = lowered[:index]
+            for separator in ("，", ",", "。", ";", "；", "\n"):
+                prefix = prefix.rsplit(separator, 1)[-1]
+            if not any(marker in prefix for marker in NEGATION_MARKERS):
+                return True
+            start = index + len(needle)
+    return False
+
 
 class WebShellGatekeeper:
     def __init__(self) -> None:
@@ -173,16 +205,16 @@ class WebShellGatekeeper:
         self._extract_triage_signal(used_dict, signals)
         self._extract_initial_verdict_signal(used_dict, signals)
 
-        # 针对 Case 2 和 Case 10 的特殊质量记录（保守收口+标注）
+        # 按信号语义记录输入质量冲突，不依赖测试案例编号。
         has_godzilla = any("Godzilla" in str(s.description) or "AES/RSA" in str(s.description) for s in signals)
         has_kernel = any("内核驱动" in str(s.description) or "Wingtb.sys" in str(s.description) for s in signals)
         if has_godzilla and has_kernel:
-            issues.append("Case 2 数据质量问题：WebShell特征与内核驱动证据(Wingtb.sys)语义冲突，已按保守收口处理")
+            issues.append("输入信号语义冲突：WebShell加密通信特征与内核驱动证据同时出现，已按保守规则处理")
 
         is_webshell_type = any(s.name == "event_type_webshell" for s in signals)
         has_brute_force = any("暴力破解" in str(s.description) or "SSH" in str(s.description) for s in signals)
         if is_webshell_type and has_brute_force:
-            issues.append("Case 10 数据质量问题：event_type=WebShell 与 SSH暴力破解证据严重冲突，确认为误标案例")
+            issues.append("事件类型与证据冲突：event_type=WebShell，但告警或证据指向SSH暴力破解；需复核事件类型")
 
         overall = self._aggregate_strength(signals)
         gate_decision = self._to_gate_decision(overall)
@@ -249,19 +281,8 @@ class WebShellGatekeeper:
             text = str(t)
             text_lower = text.lower()
 
-            # 1. 强确认
-            if any(k.lower() in text_lower for k in WEBSHELL_STRONG_CONFIRM_KEYWORDS):
-                out.append(
-                    GatekeeperSignal(
-                        name="input_strong_webshell",
-                        description=text,
-                        strength=SignalStrength.IN_SCOPE_CONFIRMED,
-                        source=source,
-                    )
-                )
-                continue
-
-            # 2. 域外
+            # 1. 域外信号优先于通用进程/函数词，避免 SSH 等其他攻击链
+            # 因偶然包含 cmd.exe 等文本被错误归入 WebShell。
             if any(k.lower() in text_lower for k in OUT_OF_SCOPE_KEYWORDS):
                 out.append(
                     GatekeeperSignal(
@@ -273,7 +294,7 @@ class WebShellGatekeeper:
                 )
                 continue
 
-            # 3. 良性
+            # 2. 明确合法/正常语境优先，不能仅凭其中的编码、上传或进程词升级。
             if any(k.lower() in text_lower for k in BENIGN_LIKE_KEYWORDS):
                 out.append(
                     GatekeeperSignal(
@@ -285,8 +306,20 @@ class WebShellGatekeeper:
                 )
                 continue
 
+            # 3. 强确认；同一分句中被“未发现/未检测到”等否定的词不计入。
+            if _contains_affirmed_keyword(text, WEBSHELL_STRONG_CONFIRM_KEYWORDS):
+                out.append(
+                    GatekeeperSignal(
+                        name="input_strong_webshell",
+                        description=text,
+                        strength=SignalStrength.IN_SCOPE_CONFIRMED,
+                        source=source,
+                    )
+                )
+                continue
+
             # 4. 弱信号
-            if any(k.lower() in text_lower for k in WEBSHELL_WEAK_KEYWORDS):
+            if _contains_affirmed_keyword(text, WEBSHELL_WEAK_KEYWORDS):
                 out.append(
                     GatekeeperSignal(
                         name="input_weak_webshell",

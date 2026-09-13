@@ -158,7 +158,7 @@ PYTHONPATH=src python -m unittest tests.test_knowledge_tool -v
 
 # 工具清单（无需 LLM key；MCP 依赖本地配置）
 PYTHONPATH=src python -m sec_agent.deep_agent.main --event tests/fixtures/investigation/sample_event.json --list-tools
-#   预期：26 个工具（6 Mock + knowledge_query + 19 MCP）
+#   实际数量取决于事件门禁和MCP tools/list；不得固定宣称26个
 
 # 完整调查（需配置 LLM key；-o 自动加时间戳）
 PYTHONPATH=src python -m sec_agent.deep_agent.main --event tests/fixtures/investigation/sample_event.json -o report.json
@@ -173,7 +173,7 @@ $env:INVESTIGATION_BACKEND="auto"; $env:PYTHONPATH="src"; python -m uvicorn sec_
 
 - 单元测试（`test_investigation_agent.py`）16 项通过 / 1 项跳过（合计 17，均不依赖 LLM）。
 - bridge 集成测试（`test_investigation_and_dispatcher_integration.py`）5 项通过（含真实模块加载回归）。
-- 知识包检索（`test_knowledge_tool.py`）19 项全部通过；`knowledge_query` 已注册（CLI 与主链 bridge，6 mock + 1 knowledge + 19 mcp = 26）；问答样本 5 题中 4 题命中，样本 2（攻击组织）如实标记为知识缺口。
+- 历史知识检索测试曾验证问答样本5题中4题命中；2026-09-13收口后，`knowledge_query`改为仅在`guarded`且取得合法三档门禁结果时注册，不再使用固定“26个工具”作为验收判据。
 - 完整调查（真实 LLM，独立运行）：7 次 Mock 工具调用、完整结构化报告、未内部 fallback。
 - 主链实测（`auto` 后端，真实 LLM）：8 次工具调用（4 Mock failed + 4 dbproxy MCP 空）→ `need_manual_takeover=true` → 停在 `HUMAN_REQUIRED`，不自动处置；未发生内部 fallback。
 - 主链实测（`tool_mock` 后端，内部子链）：2 次工具调用（`evidence_lookup` + `xdr_log_query`）→ 处置方案 → `APPROVAL_REQUIRED` → 审批 → `EXECUTING` → `VERIFYING` → `COMPLETED`；`GET /events/{id}/timeline` 9 步完整、`GET /metrics` 完成计数 +1。

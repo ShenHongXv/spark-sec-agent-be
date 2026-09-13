@@ -15,12 +15,47 @@ from sec_agent.domain.models import (
 )
 from sec_agent.platforms.fixed_sample import FixedSampleAdapter
 from sec_agent.repositories.memory import InMemoryEventRepository
-from sec_agent.services.deep_agent_bridge import DeepAgentBridgeUnavailable
+from sec_agent.services.deep_agent_bridge import DeepAgentBridge, DeepAgentBridgeUnavailable
 from sec_agent.services.investigation import DeepInvestigationAgent
 from sec_agent.services.orchestrator import Orchestrator
 
 
 class DeepAgentBridgeTest(unittest.TestCase):
+    def test_guarded_mode_without_gate_result_does_not_register_knowledge(self) -> None:
+        bridge = DeepAgentBridge()
+        modules = bridge._load_modules()
+        config = modules["load_config"]()
+        config.tools.mode = "mock"
+        config.tools.knowledge_mode = "guarded"
+
+        registry = bridge._build_tools(modules, config, gate_decision=None)
+
+        self.assertNotIn("knowledge_query", registry.names())
+
+    def test_guarded_mode_registers_gate_bound_knowledge(self) -> None:
+        bridge = DeepAgentBridge()
+        modules = bridge._load_modules()
+        config = modules["load_config"]()
+        config.tools.mode = "mock"
+        config.tools.knowledge_mode = "guarded"
+
+        registry = bridge._build_tools(modules, config, gate_decision="weak_signal")
+        result = registry.get("knowledge_query").call({"keyword": "WebShell 植入方式"})
+
+        self.assertEqual(result.status, "partial")
+        self.assertFalse(result.data["knowledge_returned"])
+
+    def test_guarded_mode_out_of_scope_does_not_expose_webshell_knowledge(self) -> None:
+        bridge = DeepAgentBridge()
+        modules = bridge._load_modules()
+        config = modules["load_config"]()
+        config.tools.mode = "mock"
+        config.tools.knowledge_mode = "guarded"
+
+        registry = bridge._build_tools(modules, config, gate_decision="out_of_scope")
+
+        self.assertNotIn("knowledge_query", registry.names())
+
     def test_deep_agent_backend_maps_external_report_to_domain_report(self) -> None:
         old_modules = dict(sys.modules)
         self._install_fake_deep_agent()

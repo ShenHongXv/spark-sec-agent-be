@@ -399,11 +399,28 @@ class KnowledgeQueryTool(Tool):
                 },
             )
 
-        if self._gate_decision not in {None, "in_scope"}:
+        if self._gate_decision is None:
+            return ToolResult(
+                status="failed",
+                summary="知识门禁结果缺失，已按安全默认拒绝返回知识",
+                error="missing_knowledge_gate_decision",
+                retryable=False,
+                data={
+                    "gate_decision": None,
+                    "knowledge_returned": False,
+                },
+            )
+
+        if self._gate_decision != "in_scope":
             return ToolResult(
                 status="failed",
                 summary=f"无效的知识门禁状态：{self._gate_decision}",
                 error="invalid_knowledge_gate_decision",
+                retryable=False,
+                data={
+                    "gate_decision": self._gate_decision,
+                    "knowledge_returned": False,
+                },
             )
         try:
             card = match_knowledge_card(self._cards, keyword)
@@ -457,7 +474,7 @@ class KnowledgeQueryTool(Tool):
                 },
                 "related_cases": card.related_cases,
                 "knowledge_returned": True,
-                "gate_decision": self._gate_decision or "in_scope",
+                "gate_decision": self._gate_decision,
             },
         )
 

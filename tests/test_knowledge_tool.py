@@ -64,7 +64,7 @@ class TestKeywordMatch(unittest.TestCase):
 
 class TestKnowledgeQueryTool(unittest.TestCase):
     def setUp(self):
-        self.tool = build_knowledge_tools()[0]
+        self.tool = build_knowledge_tools(gate_decision="in_scope")[0]
 
     def test_schema_ascii_and_name(self):
         schema = self.tool.to_openai_schema()
@@ -99,7 +99,7 @@ class TestKnowledgeQueryTool(unittest.TestCase):
 
     def test_registered_in_registry(self):
         reg = ToolRegistry()
-        for t in build_knowledge_tools():
+        for t in build_knowledge_tools(gate_decision="in_scope"):
             reg.register(t)
         names = [s["function"]["name"] for s in reg.schemas()]
         self.assertIn("knowledge_query", names)

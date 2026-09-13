@@ -32,6 +32,17 @@ def test_out_of_scope_returns_scope_mismatch():
     assert result.data["gate_decision"] == "out_of_scope"
     assert result.data["knowledge_returned"] is False
 
+
+def test_missing_gate_decision_fails_closed():
+    tool = KnowledgeQueryTool()
+
+    result = tool.call({"keyword": "WebShell 植入方式"})
+
+    assert result.status == "failed"
+    assert result.error == "missing_knowledge_gate_decision"
+    assert result.data["gate_decision"] is None
+    assert result.data["knowledge_returned"] is False
+
 def test_not_found_is_distinct():
     tool = KnowledgeQueryTool(gate_decision="in_scope")
 

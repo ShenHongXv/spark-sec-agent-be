@@ -30,10 +30,11 @@ class DeepAgentBridge:
         if not getattr(llm, "available", False):
             raise DeepAgentBridgeUnavailable("deep_agent LLM 未配置")
 
-        tools = self._build_tools(modules, config)
         deep_event = modules["SecurityEventInput"].from_dict(
             self._to_deep_agent_input(trace_id=trace_id, run_id=run_id, event=event, triage=triage)
         )
+        gate_decision = self._knowledge_gate_decision(deep_event, config)
+        tools = self._build_tools(modules, config, gate_decision=gate_decision)
         deep_report = modules["DeepInvestigationAgent"](config, llm, tools).investigate(deep_event)
         return self._to_domain_report(deep_report, triage)
 
@@ -60,7 +61,13 @@ class DeepAgentBridge:
         if tool_mode and hasattr(config, "tools"):
             config.tools.mode = tool_mode
 
-    def _build_tools(self, modules: dict[str, Any], config: Any) -> Any:
+    def _build_tools(
+        self,
+        modules: dict[str, Any],
+        config: Any,
+        *,
+        gate_decision: str | None,
+    ) -> Any:
         registry = modules["ToolRegistry"]()
         tool_mode = getattr(getattr(config, "tools", object()), "mode", "auto")
         knowledge_mode = getattr(
@@ -73,8 +80,13 @@ class DeepAgentBridge:
             for tool in modules["build_mock_tools"]():
                 registry.register(tool)
 
-        if knowledge_mode == "guarded":
-            self._register_knowledge_tools(registry, modules)
+        # guarded 模式必须先得到有效三档门禁结果。门禁缺失或审计异常时不注册
+        # knowledge_query，避免无门禁工具残留形成 fail-open。
+        if knowledge_mode == "guarded" and gate_decision in {
+            "in_scope",
+            "weak_signal",
+        }:
+            self._register_knowledge_tools(registry, modules, gate_decision)
 
         if tool_mode in {"mcp", "auto"}:
             self._register_mcp_tools(
@@ -85,12 +97,37 @@ class DeepAgentBridge:
             )
         return registry
 
-    def _register_knowledge_tools(self, registry: Any, modules: dict[str, Any]) -> None:
+    def _knowledge_gate_decision(self, deep_event: Any, config: Any) -> str | None:
+        knowledge_mode = getattr(
+            getattr(config, "tools", object()),
+            "knowledge_mode",
+            "guarded",
+        )
+        if knowledge_mode != "guarded":
+            return None
+        try:
+            from sec_agent.services.gatekeeper import WebShellGatekeeper
+
+            decision = WebShellGatekeeper().audit(deep_event).gate_decision.value
+        except Exception as exc:  # noqa: BLE001 - 门禁异常必须安全降级为禁用知识
+            print(
+                f"[warn] 知识门禁审计失败，已禁用知识工具: {type(exc).__name__}",
+                file=sys.stderr,
+            )
+            return None
+        return decision if decision in {"in_scope", "weak_signal", "out_of_scope"} else None
+
+    def _register_knowledge_tools(
+        self,
+        registry: Any,
+        modules: dict[str, Any],
+        gate_decision: str,
+    ) -> None:
         try:
             build_knowledge_tools = importlib.import_module(f"{modules['package']}.tools.knowledge").build_knowledge_tools
         except ModuleNotFoundError:
             return
-        for tool in build_knowledge_tools():
+        for tool in build_knowledge_tools(gate_decision=gate_decision):
             registry.register(tool)
 
     def _register_mcp_tools(self, registry: Any, config: Any, package: str, strict: bool) -> None:
