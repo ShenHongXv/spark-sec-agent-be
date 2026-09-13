@@ -150,13 +150,16 @@ class DeepAgentBridge:
     ) -> dict[str, Any]:
         return {
             "event_id": event.event_id,
-            "event_type": self._event_type(event),
+            "event_type": event.event_type,
             "severity": triage.priority.value.upper(),
             "timestamp": event.first_seen_at.isoformat(),
             "source_ip": self._first_entity(event, "src_ips"),
             "target_ip": self._first_entity(event, "dst_ips") or self._first_entity(event, "assets"),
-            "alerts": list(event.alert_refs),
-            "evidence": list(triage.supporting_evidence_refs),
+            "alerts": self._described_refs(event.alert_refs, event.alert_summaries),
+            "evidence": self._described_refs(
+                triage.supporting_evidence_refs,
+                event.evidence_summaries,
+            ),
             "initial_verdict": triage.verdict.value,
             "confidence": triage.confidence,
             "triage": triage.model_dump(mode="json"),
@@ -192,10 +195,15 @@ class DeepAgentBridge:
         )
 
     @staticmethod
-    def _event_type(event: SecurityEvent) -> str:
-        if event.summary:
-            return event.summary
-        return ",".join(event.alert_refs)
+    def _described_refs(refs: list[str], descriptions: list[str]) -> list[str]:
+        """同时传递稳定引用和语义摘要，供审计定位与门禁判断使用。"""
+        values = [
+            f"{ref}: {descriptions[index]}" if index < len(descriptions) else ref
+            for index, ref in enumerate(refs)
+        ]
+        if len(descriptions) > len(refs):
+            values.extend(descriptions[len(refs):])
+        return values
 
     @staticmethod
     def _first_entity(event: SecurityEvent, key: str) -> str:

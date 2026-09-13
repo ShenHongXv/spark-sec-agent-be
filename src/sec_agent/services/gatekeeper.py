@@ -90,6 +90,7 @@ WEBSHELL_STRONG_CONFIRM_KEYWORDS: tuple[str, ...] = (
     "进程隐藏行为",
     "AES/RSA加密通信特征",
     "子进程 cmd.exe",
+    "Web 进程派生 shell 进程",
 )
 
 WEBSHELL_WEAK_KEYWORDS: tuple[str, ...] = (
@@ -244,7 +245,8 @@ class WebShellGatekeeper:
         et = (d.get("event_type") or "").strip()
         if not et:
             return
-        if et == "WebShell":
+        normalized = et.lower().replace("-", "_")
+        if normalized in {"webshell", "web_shell"}:
             out.append(
                 GatekeeperSignal(
                     name="event_type_webshell",
@@ -253,7 +255,11 @@ class WebShellGatekeeper:
                     source=SignalSource.EVENT_TYPE,
                 )
             )
-        elif any(k in et for k in ("WordPress_Compromise", "SSH", "Brute")):
+        elif normalized in {
+            "sql_injection",
+            "lateral_movement",
+            "unauthorized_access",
+        } or any(k.lower() in normalized for k in ("WordPress_Compromise", "SSH", "Brute")):
             out.append(
                 GatekeeperSignal(
                     name="event_type_out_of_scope",
@@ -335,6 +341,7 @@ class WebShellGatekeeper:
         if not isinstance(triage, dict):
             return
         verdict = str(triage.get("verdict") or "").strip()
+        normalized = verdict.lower()
         if not verdict:
             return
         if any(k in verdict for k in OUT_OF_SCOPE_KEYWORDS):
@@ -346,7 +353,7 @@ class WebShellGatekeeper:
                     source=SignalSource.TRIAGE,
                 )
             )
-        elif any(k in verdict for k in ("真实攻击", "恶意", "疑似")):
+        elif normalized == "malicious" or any(k in verdict for k in ("真实攻击", "恶意", "疑似")):
             out.append(
                 GatekeeperSignal(
                     name="triage_malicious_like",
@@ -355,7 +362,7 @@ class WebShellGatekeeper:
                     source=SignalSource.TRIAGE,
                 )
             )
-        elif any(k in verdict for k in ("误报", "无关", "良性", "合法")):
+        elif normalized == "benign" or any(k in verdict for k in ("误报", "无关", "良性", "合法")):
             out.append(
                 GatekeeperSignal(
                     name="triage_benign_like",
@@ -377,6 +384,7 @@ class WebShellGatekeeper:
     def _extract_initial_verdict_signal(self, d: dict[str, Any], out: list[GatekeeperSignal]) -> None:
         """从 initial_verdict 文本字段读取信号，并正确标注其真实来源。"""
         verdict = (d.get("initial_verdict") or "").strip()
+        normalized = verdict.lower()
         if not verdict:
             return
         if any(k in verdict for k in OUT_OF_SCOPE_KEYWORDS):
@@ -388,7 +396,7 @@ class WebShellGatekeeper:
                     source=SignalSource.INITIAL_VERDICT,
                 )
             )
-        elif any(k in verdict for k in ("真实攻击", "恶意", "疑似")):
+        elif normalized == "malicious" or any(k in verdict for k in ("真实攻击", "恶意", "疑似")):
             out.append(
                 GatekeeperSignal(
                     name="verdict_malicious_like",
@@ -397,7 +405,7 @@ class WebShellGatekeeper:
                     source=SignalSource.INITIAL_VERDICT,
                 )
             )
-        elif any(k in verdict for k in ("误报", "无关", "良性", "合法")):
+        elif normalized == "benign" or any(k in verdict for k in ("误报", "无关", "良性", "合法")):
             out.append(
                 GatekeeperSignal(
                     name="verdict_benign_like",

@@ -16,11 +16,73 @@ from sec_agent.domain.models import (
 from sec_agent.platforms.fixed_sample import FixedSampleAdapter
 from sec_agent.repositories.memory import InMemoryEventRepository
 from sec_agent.services.deep_agent_bridge import DeepAgentBridge, DeepAgentBridgeUnavailable
+from sec_agent.services.correlation import AlertCorrelationService
+from sec_agent.services.gatekeeper import GateDecision, WebShellGatekeeper
 from sec_agent.services.investigation import DeepInvestigationAgent
 from sec_agent.services.orchestrator import Orchestrator
+from sec_agent.services.triage import RiskTriageService
 
 
 class DeepAgentBridgeTest(unittest.TestCase):
+    def test_fixed_sample_real_path_allows_guarded_knowledge(self) -> None:
+        adapter = FixedSampleAdapter()
+        alerts = adapter.fetch_alerts(sample_id="webshell-001")
+        event = AlertCorrelationService().correlate(alerts)
+        triage = RiskTriageService().triage(event, alerts)
+        bridge = DeepAgentBridge()
+        modules = bridge._load_modules()
+        deep_event = modules["SecurityEventInput"].from_dict(
+            bridge._to_deep_agent_input(
+                trace_id="trace-real-path",
+                run_id="run-real-path",
+                event=event,
+                triage=triage,
+            )
+        )
+
+        gate = WebShellGatekeeper().audit(deep_event)
+
+        self.assertEqual(deep_event.event_type, "webshell")
+        self.assertEqual(gate.gate_decision, GateDecision.IN_SCOPE)
+        self.assertTrue(any("Web 进程派生 shell 进程" in item for item in deep_event.evidence))
+
+        config = modules["load_config"]()
+        config.tools.mode = "mock"
+        config.tools.knowledge_mode = "guarded"
+        registry = bridge._build_tools(modules, config, gate_decision=gate.gate_decision.value)
+        result = registry.get("knowledge_query").call({"keyword": "WebShell攻击原理"})
+        self.assertEqual(result.status, "success")
+        self.assertTrue(result.data["knowledge_returned"])
+
+    def test_malicious_non_webshell_real_path_does_not_release_knowledge(self) -> None:
+        adapter = FixedSampleAdapter()
+        source = adapter.fetch_alerts(sample_id="webshell-001")[0]
+        alert = source.model_copy(
+            update={
+                "alert_type": "lateral_movement",
+                "name": "SMB 横向移动告警",
+                "raw_severity": "critical",
+                "evidence_refs": [],
+            }
+        )
+        event = AlertCorrelationService().correlate([alert])
+        triage = RiskTriageService().triage(event, [alert])
+        bridge = DeepAgentBridge()
+        modules = bridge._load_modules()
+        deep_event = modules["SecurityEventInput"].from_dict(
+            bridge._to_deep_agent_input(
+                trace_id="trace-non-webshell",
+                run_id="run-non-webshell",
+                event=event,
+                triage=triage,
+            )
+        )
+
+        gate = WebShellGatekeeper().audit(deep_event)
+
+        self.assertEqual(triage.verdict, TruthVerdict.MALICIOUS)
+        self.assertEqual(gate.gate_decision, GateDecision.OUT_OF_SCOPE)
+
     def test_guarded_mode_without_gate_result_does_not_register_knowledge(self) -> None:
         bridge = DeepAgentBridge()
         modules = bridge._load_modules()
@@ -218,6 +280,9 @@ class DeepAgentBridgeTest(unittest.TestCase):
             alert_count_before=1,
             event_count_after=1,
             summary="WebShell 高危事件",
+            event_type="webshell",
+            alert_summaries=["WebShell 上传后命令执行"],
+            evidence_summaries=["Web 进程派生 shell 进程"],
         )
 
     def _triage(self) -> TriageResult:
