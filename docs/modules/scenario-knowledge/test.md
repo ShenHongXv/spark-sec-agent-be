@@ -31,6 +31,8 @@
 
 唯一warning来自Starlette TestClient对AnyIO旧别名的弃用提示，不影响本轮功能判定。跳过项仍须结合测试名和最终CI说明，不得笼统写成全部通过。
 
+远程证据：PR #50头`6f59e59`的GitHub Actions（run `34737593920`）已通过，Python 3.11结果为`312 passed, 1 skipped`。后续纯文档提交不改变上述运行代码；最终合并前仍须确认PR最新检查保持绿色。
+
 ## 1. 测试范围
 
 本模块的验收分为三层：
@@ -118,7 +120,7 @@ manual_takeover, step_count, duration_ms, human_review
 
 - [x] PR 冲突解决工作树的 21 条相关自动化测试通过（2026-09-05）。
 - [x] 评测汇总 Schema 与最小 fixture 已冻结并加入结构守护测试（2026-09-06）。
-- [ ] PR 最新提交的仓库 CI 通过。
+- [x] PR #50安全P0代码及状态文档头`6f59e59`的仓库CI通过：`312 passed, 1 skipped`。
 - [ ] case1、case2 在最终提交上完成报告复验，知识引用与事件证据分开。
 - [ ] case6 在最终提交上完成负向复验，未调用 WebShell 知识且未新增 WebShell 事实。
 - [ ] Agent 报告、运行元数据和回执保存到团队指定受控位置，仓库只保留判据和结论索引。
